@@ -3,6 +3,7 @@ from scipy.optimize import rosen
 from scipy.spatial import distance_matrix
 
 epsilon = np.finfo(float).eps
+np.random.seed(0)
 
 
 def create_population(fitness_function, lwr_bnd, upp_bnd, n, d):
@@ -17,21 +18,22 @@ def compute_number_sparks_si(fitness, m, i):
     return m * ((f_max - fitness[i] + epsilon) /
                 (sum(f_max - fitness) + epsilon))  # Eq1
 
+def round_si(si, a, b, m):
+    if si < a * m:
+        si = int(round(a * m))
+    elif si > b * m:
+        si = int(round(b * m))
+    else:
+        si = int(round(si))
+    return si
 
-def compute_explosion_amplitude(fitness, A, i):
+def compute_explosion_amplitude(fitness, A_hat, i):
     f_min = min(fitness)
-    return (A * ((fitness[i] - f_min + epsilon) /
+    return (A_hat * ((fitness[i] - f_min + epsilon) /
                  (sum(fitness - f_min) + epsilon)))  # Eq2
 
 
-def round_si(si, a, b, number_sparks):
-    if si < a * number_sparks:
-        si = round(a * number_sparks)
-    elif si > b * number_sparks:
-        si = round(b * number_sparks)
-    else:
-        si = round(si)
-    return si
+
 
 
 def fa_iteration(fitness_function, pop, fit, lwr_bnd, upp_bnd, n,
@@ -52,6 +54,27 @@ def fa_iteration(fitness_function, pop, fit, lwr_bnd, upp_bnd, n,
 
     # extract n-1 indexes with p
     p_indexes = np.random.choice(range(m - 1), n - 1, replace=False, p=p)
+
+    # produces n fireworks
+    fireworks = np.zeros(shape=(3, 3))
+    fireworks[0, :] = x_star
+    fireworks[1:n, :] = pop[p_indexes, :]
+    fitness = np.zeros(3)
+    fitness[0] = x_star_fit
+    fitness[1:n] = fit[p_indexes]
+
+    # compute Si
+
+    for i in range(n):
+        si = compute_number_sparks_si(fitness, m, i)
+        si = round_si(si, a, b, m)
+        ai = compute_explosion_amplitude(fitness, A_hat, i)
+        sparks_i = np.zeros((si, d))
+        for spark in range(si):
+            sparks_i[spark, :] = fireworks[i, :]
+            z = round(d * np.random.random())
+            z = np.random.choice(range(d), z, replace=False)
+            h = ai * np.random.uniform(-1, 1)
 
     # produce the m_hat gaussian sparks
 
@@ -118,3 +141,15 @@ lb = np.repeat(-5, dimensions)
 ub = np.repeat(5, dimensions)
 
 pop, fit = hybrid(rosen, lb, ub, 0.6)
+
+todas = list()
+for j in range(1000):
+    pop, fit = create_population(rosen, -5, 5, 5, 3)
+    sparks = list()
+    for i in range(5):
+        si = compute_number_sparks_si(fit, m, i)
+        si = round_si(si, a, b, m)
+        sparks.append(si)
+    todas.append(sum(sparks))
+todas = np.array(todas)
+    
