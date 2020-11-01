@@ -38,6 +38,7 @@ def compute_explosion_amplitude(fitness, A_hat, i):
 
 def fa_iteration(fitness_function, pop, fit, lwr_bnd, upp_bnd, n,
                  d, m, m_hat, A_hat, a, b):
+    
     # extract best individual
     x_star_idx = np.argmin(fit)
     x_star = pop[x_star_idx, :]
@@ -47,12 +48,11 @@ def fa_iteration(fitness_function, pop, fit, lwr_bnd, upp_bnd, n,
     fit = np.delete(fit, x_star_idx)
 
     # narrow down to n individuals with a distance matrix
-
     overall_distance = np.sum(distance_matrix(pop, pop), axis=0)
 
     p = np.divide(overall_distance, np.sum(overall_distance))
 
-    # extract n-1 indexes with p
+    # extract n-1 indexes using p
     p_indexes = np.random.choice(range(m - 1), n - 1, replace=False, p=p)
 
     # produces n fireworks
@@ -62,6 +62,8 @@ def fa_iteration(fitness_function, pop, fit, lwr_bnd, upp_bnd, n,
     fitness = np.zeros(3)
     fitness[0] = x_star_fit
     fitness[1:n] = fit[p_indexes]
+    
+    new_population = np.array(fireworks)
 
     # compute Si
 
@@ -75,12 +77,42 @@ def fa_iteration(fitness_function, pop, fit, lwr_bnd, upp_bnd, n,
             z = round(d * np.random.random())
             z = np.random.choice(range(d), z, replace=False)
             h = ai * np.random.uniform(-1, 1)
+            
+            # linear displacement
+            sparks_i[spark, z] = sparks_i[spark, z] + h
+
+            # map sparks back to the search space
+            idx = np.where(sparks_i[spark, :] < lwr_bnd)
+            sparks_i[spark, idx] = lwr_bnd[idx]
+            idx = np.where(sparks_i[spark, :] > upp_bnd)
+            sparks_i[spark, idx] = upp_bnd[idx]
+
+        new_population = np.concatenate((new_population, sparks_i), axis=0)
 
     # produce the m_hat gaussian sparks
+    idx = np.random.choice(range(len(new_population)), m_hat, replace = True)
+    gaussian_sparks = np.array(new_population[idx, :])
+    
+    for i in range(m_hat):
+        z = round(d * np.random.random())
+        z = np.random.choice(range(d), z, replace=False)
+#            perform gaussian displacement
+        g = np.random.normal(1, 1)
+        gaussian_sparks[i, z] = gaussian_sparks[i, z] * g
+        
+#            map sparks back to the search space
+        idx = np.where(gaussian_sparks[i, :] < lwr_bnd)
+        gaussian_sparks[i, idx] = lwr_bnd[idx]
+        idx = np.where(gaussian_sparks[i, :] > upp_bnd)
+        gaussian_sparks[i, idx] = upp_bnd[idx]
+   
+    new_population = np.concatenate((gaussian_sparks, new_population), axis = 0)
+    
+    new_population = new_population[:m, :]
+    
+    new_fitnesses = np.apply_along_axis(fitness_function, 1, new_population)
 
-    # produce the remaining ones up to m
-
-    return 1, 2
+    return new_population, new_fitnesses
 
 
 def de_iteration(fitness_function, population, fitnesses, lwr_bnd, upp_bnd, m,
